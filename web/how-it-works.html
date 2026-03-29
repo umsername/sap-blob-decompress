@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>sapblob - why it works</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="container">
+  <nav class="nav">
+    <a href="index.html">Online generator</a>
+    <a href="how-it-works.html">Why it works</a>
+    <a href="help.html">Help</a>
+    <a href="troubleshooting.html">Troubleshooting</a>
+    <a href="examples.html">Examples</a>
+      <a href="install.html">Install</a>
+  </nav>
+
+  <section class="hero">
+    <h1>Why this works</h1>
+    <p>The modern SAP wrapper handled by this repository is not a separate magic compressor. It is an SAP header, followed by a few padding bits, in front of what becomes a standard raw DEFLATE stream once the bit alignment is corrected.</p>
+    <p>This means the hard part is not inventing a new decompressor. The hard part is understanding the wrapper, validating the header, and shifting the payload back into alignment before handing it to a standard inflater.</p>
+  </section>
+
+  <section class="grid">
+    <article class="card">
+      <h2>Observed structure</h2>
+      <pre>[4 bytes original size][1 byte version/algo][3 bytes flags][2-5 padding bits][raw DEFLATE stream]</pre>
+      <p>Once the wrapper and padding are removed, Go's standard <code>compress/flate</code> reader can handle the actual decompression.</p>
+    </article>
+    <article class="card">
+      <h2>What that means in practice</h2>
+      <p>The implementation stays small because the real work is understanding the wrapper and bit alignment correctly. The decompression itself is standard library work.</p>
+    </article>
+  </section>
+
+  <section class="card page-section">
+    <h2>The full reverse-engineering story</h2>
+    <p>The starting point was a file called <code>test.data021</code>: high-entropy binary data extracted from an SAP data BLOB, known to contain a document, but unreadable by ordinary archive and compression tools.</p>
+    <h3>The problem</h3>
+    <p>The file was 118,703 bytes of unrecognizable binary. It clearly came from an SAP-backed storage flow, but after extraction as a raw database BLOB, ordinary tools could not open it. The task was simple in theory and tedious in practice: determine what the wrapper was doing and recover the original file bytes without relying on proprietary tooling.</p>
+    <h3>Step 1: First look</h3>
+    <pre>$ file test.data021
+test.data021: data
+
+$ python3 -c "
+from collections import Counter
+import math
+data = open('test.data021','rb').read()
+freq = Counter(data)
+H = -sum((c/len(data))*math.log2(c/len(data)) for c in freq.values())
+print(f'Entropy: {H:.2f} bits/byte')
+print(f'Unique bytes: {len(freq)} / 256')
+"
+Entropy: 8.00 bits/byte
+Unique bytes: 256 / 256</pre>
+    <p>Entropy at the theoretical ceiling and all 256 byte values present meant the file was either heavily compressed or encrypted. It was not ordinary uncompressed document data.</p>
+    <h3>Step 2: Try everything obvious first</h3>
+    <p>Common formats were tested and rejected before any SAP-specific conclusion was drawn. That matters. Reverse engineering gets weaker when people jump straight to the answer they want.</p>
+    <table class="table">
+      <thead>
+      <tr><th>Format or transform</th><th>Result</th></tr>
+      </thead>
+      <tbody>
+      <tr><td>gzip, bzip2, xz, zstd, lz4</td><td>Not recognized</td></tr>
+      <tr><td>ZIP, 7z, RAR, TAR</td><td>Not recognized</td></tr>
+      <tr><td>Brotli, Snappy, LZO, LZMA</td><td>Failed</td></tr>
+      <tr><td>PostgreSQL pglz, BSON, msgpack</td><td>No match</td></tr>
+      <tr><td>All 256 single-byte XOR keys</td><td>No PDF signature</td></tr>
+      <tr><td>Bit rotation, nibble swap, byte reversal</td><td>Nothing useful</td></tr>
+      </tbody>
+    </table>
+    <p>After that sweep, the evidence pointed away from ordinary compression containers and toward a wrapper format or SAP-specific transform.</p>
+    <h3>Step 3: The hex dump clue</h3>
+    <pre>Offset  Hex                              ASCII
+000000  3F F7 01 00 12 1F 9D 02  25 ...  ?.......%</pre>
+    <table class="table">
+      <thead>
+      <tr><th>Offset</th><th>Value</th><th>Meaning</th></tr>
+      </thead>
+      <tbody>
+      <tr><td>0-3</td><td><code>3F F7 01 00</code> = 128,831</td><td>Uncompressed size (little-endian)</td></tr>
+      <tr><td>4</td><td><code>0x12</code></td><td>Version 1, algorithm 2</td></tr>
+      <tr><td>5-6</td><td><code>1F 9D</code></td><td>Flags or magic-related bytes</td></tr>
+      <tr><td>7</td><td><code>0x02</code></td><td>Flags</td></tr>
+      <tr><td>8</td><td><code>0x25</code> = <code>%</code></td><td>First recognizable byte of <code>%PDF</code></td></tr>
+      </tbody>
+    </table>
+    <p>That byte-level clue changed the posture. The payload clearly began immediately after an 8-byte wrapper, but the stream was not simply "header plus plain file." There was still alignment logic involved.</p>
+    <h3>Step 4: The SAP connection</h3>
+    <p>Once the file was treated as an SAP data BLOB rather than a generic archive, the public research trail became much stronger. SAP uses a family of compression routines across products such as NetWeaver, MaxDB, SAP GUI, SAPCAR, and storage-related workflows. The algorithm byte <code>0x12</code> decodes to version 1 and algorithm 2, which points to the LZH wrapper variant.</p>
+    <h3>Step 5: The key discovery</h3>
+    <p>Studying the MaxDB source lineage reveals the central fact: SAP's so-called LZH wrapper is not an exotic new compression algorithm in the payload body. Once normalized, the body behaves like standard RFC 1951 DEFLATE.</p>
+    <pre>// SAP extra-length-bits table:
+int CsExtraLenBits[] = {0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,
+                        3,3,3,3,4,4,4,4,5,5,5,5,0};
+
+// RFC 1951 DEFLATE uses the same structure.
+
+// SAP bit-length order:
+unsigned char bl_order[] = {16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15};
+
+// RFC 1951 DEFLATE uses the same ordering.</pre>
+    <p>The dynamic and fixed block handling in the SAP code line up with DEFLATE block types, and the bit reader is standard LSB-first logic. That narrows the SAP-specific behavior down to two additions around the payload, not a full proprietary compressor.</p>
+  </section>
+
+  <section class="grid page-section">
+    <article class="card">
+      <h2>The two SAP-specific additions</h2>
+      <ol>
+        <li>An 8-byte header carrying the original size, version/algo byte, and flags.</li>
+        <li>2-5 padding bits, historically called "nonsense bits" in the source lineage, inserted before the raw DEFLATE stream.</li>
+      </ol>
+      <p>Those padding bits are enough to break off-the-shelf tools until the bitstream is shifted back into alignment.</p>
+    </article>
+    <article class="card">
+      <h2>Why the output is generic by default</h2>
+      <p>The wrapper stores compressed bytes, not necessarily a trustworthy original filename. The recovered payload may be a PDF, image, Office document, ZIP, XML, text, or arbitrary binary.</p>
+      <p>That is why the CLI and web page both use best-effort type detection from magic bytes. When the recovered payload cannot be identified confidently, the safe fallback extension is <code>.bin</code>.</p>
+    </article>
+  </section>
+
+  <section class="card page-section">
+    <h2>Research lineage</h2>
+    <table class="table">
+      <thead>
+      <tr><th>Source</th><th>Contribution</th></tr>
+      </thead>
+      <tbody>
+      <tr>
+        <td>Martin Gallo</td>
+        <td>
+          Public SAP compression and security research, including
+          <a href="https://github.com/OWASP/pysap">pysap</a>
+          and earlier reverse-engineering work.
+        </td>
+      </tr>
+
+      <tr>
+        <td>Daniel Berlin</td>
+        <td>
+          <a href="https://www.daniel-berlin.de/devel/sap-dev/decompress-abap-source-code/">
+            SAP REPOSRC decompressor
+          </a>
+          notes and practical direction for wrapper handling.
+        </td>
+      </tr>
+
+      <tr>
+        <td>Hans-Christian Esperer</td>
+        <td>
+          <a href="https://github.com/VirtualForgeGmbH/hascar">hascar</a>
+          Haskell implementation and format documentation.
+        </td>
+      </tr>
+
+      <tr>
+        <td>SAP AG / MaxDB</td>
+        <td>
+          Original open-source compression code that exposes the header layout and padding-bit behavior.
+        </td>
+      </tr>
+
+      <tr>
+        <td>RFC 1951</td>
+        <td>
+          The
+          <a href="https://www.rfc-editor.org/rfc/rfc1951">DEFLATE specification</a>
+          that explains why a standard inflater works after the wrapper is normalized.
+        </td>
+      </tr>      </tbody>
+    </table>
+    <p class="small">This repository deliberately acknowledges the public research and upstream code it builds on. Reverse engineering work becomes weaker when it is presented as if it emerged from nowhere.</p>
+  </section>
+
+  <section class="card page-section">
+    <h2>Deep dive into the logic</h2>
+    <p>At implementation level, the logic is smaller than the explanation suggests.</p>
+    <ol>
+      <li>Read the first four bytes as a little-endian uncompressed size.</li>
+      <li>Read the version/algo byte and confirm that the wrapper matches the supported SAP LZH format.</li>
+      <li>Read the first two payload bits to determine how many padding bits follow, then skip them.</li>
+      <li>Shift the remaining bitstream back into byte alignment.</li>
+      <li>Pass the normalized body to a standard raw DEFLATE inflater.</li>
+      <li>Validate that the recovered size matches the expected original size.</li>
+      <li>Optionally inspect magic bytes to identify the recovered payload type.</li>
+    </ol>
+    <pre>stream = data[8:]         # skip SAP header
+skip = 3                  # 2 length bits + 1 padding bit in one real sample
+
+shifted = bytearray()
+for i in range(len(stream) - 1):
+    shifted.append((stream[i] >> skip) | ((stream[i + 1] & 0x07) << 5))
+
+result = flate_or_zlib_raw_deflate_decode(bytes(shifted))</pre>
+    <p>That is the core idea. The rest of the repository is engineering discipline: header validation, safer output handling, file-type identification, comments, tests, and a browser-friendly demo built on the same logic compiled to WebAssembly.</p>
+    <p>The practical conclusion is straightforward: once the wrapper is understood, the format is auditable, portable, and small enough to explain. That is exactly how such tooling should be published.</p>
+  </section>
+</div>
+</body>
+</html>

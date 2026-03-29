@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>sapblob - install</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <nav class="nav">
+      <a href="index.html">Online generator</a>
+      <a href="how-it-works.html">Why it works</a>
+      <a href="help.html">Help</a>
+      <a href="troubleshooting.html">Troubleshooting</a>
+      <a href="examples.html">Examples</a>
+      <a href="install.html">Install</a>
+    </nav>
+
+    <section class="hero">
+      <h1>Install and downloads</h1>
+      <p>The public entry points are simple: use the browser demo for instant testing, use GitHub Releases for stable downloadable binaries, or build the CLI locally from source. Installer scripts are included for convenience, not because the tool needs a complex runtime.</p>
+    </section>
+
+    <section class="grid page-section">
+      <article class="card">
+        <h2>Recommended download path</h2>
+        <p>Use the GitHub Releases page for stable public downloads. Releases are intended for end users and remain attached to version tags.</p>
+        <div class="result-actions">
+          <a class="button-link" href="https://github.com/umsername/sap-blob-decompress/releases/latest">Latest release</a>
+          <a class="button-link" href="https://github.com/umsername/sap-blob-decompress/releases">All releases</a>
+        </div>
+      </article>
+
+      <article class="card">
+        <h2>Workflow artifacts</h2>
+        <p>Workflow artifacts are useful as a developer fallback, but they are temporary and not the primary public download channel. They normally require repository read access and are retained only for a limited period.</p>
+        <div class="result-actions">
+          <a class="button-link" href="https://github.com/umsername/sap-blob-decompress/actions">Actions overview</a>
+        </div>
+      </article>
+    </section>
+
+    <section class="grid page-section">
+      <article class="card">
+        <h2>Windows</h2>
+        <pre># Download a release archive from GitHub Releases and extract sapblob.exe
+# Or use the installer script directly
+
+iwr https://raw.githubusercontent.com/umsername/sap-blob-decompress/main/scripts/install.ps1 -UseBasicParsing | iex
+
+# Then run it
+sapblob.exe "C:\Users\umsername\sap-blob-decompress\test.data"</pre>
+      </article>
+
+      <article class="card">
+        <h2>Linux / macOS</h2>
+        <pre># Use the installer script directly
+curl -fsSL https://raw.githubusercontent.com/umsername/sap-blob-decompress/main/scripts/install.sh | bash
+
+# Or build locally
+go test ./...
+go build ./cmd/sapblob
+./sapblob example.blob</pre>
+      </article>
+    </section>
+
+    <section class="grid page-section">
+      <article class="card">
+        <h2>Install with Go</h2>
+        <pre>go install github.com/umsername/sap-blob-decompress/cmd/sapblob@latest</pre>
+        <p>This is the cleanest path for Go users who already have a working toolchain.</p>
+      </article>
+
+      <article class="card">
+        <h2>Self-host the web demo</h2>
+        <pre>bash ./web/build.sh
+python -m http.server 8000 --directory web</pre>
+        <p>The web demo is static. No backend is required. GitHub Pages is the intended public host, but any static file host works.</p>
+      </article>
+    </section>
+
+    <section class="card page-section">
+      <h2>What the installer scripts actually do</h2>
+      <ul>
+        <li>Detect the current operating system and CPU architecture.</li>
+        <li>Resolve the latest release tag unless a specific version is requested.</li>
+        <li>Download the matching release archive from GitHub Releases.</li>
+        <li>Extract the binary and place it in a standard install directory.</li>
+      </ul>
+      <p>They are optional convenience wrappers around the same release archives linked above.</p>
+    </section>
+  </div>
+</body>
+</html>

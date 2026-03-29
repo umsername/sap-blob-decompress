@@ -1,0 +1,23 @@
+# Build output
+/dist/
+*.exe
+*.test
+*.out
+*.coverprofile
+*.wasm
+
+# Web build artifacts
+/web/wasm_exec.js
+/web/sapblob.wasm
+
+# IDE files
+.idea/
+*.iml
+
+# OS files
+.DS_Store
+Thumbs.db
+sapblob-cli
+sapblob-cli.exe
+
+sapblob

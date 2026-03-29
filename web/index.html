@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>sapblob - online generator</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <nav class="nav">
+      <a href="index.html">Online generator</a>
+      <a href="how-it-works.html">Why it works</a>
+      <a href="help.html">Help</a>
+      <a href="troubleshooting.html">Troubleshooting</a>
+      <a href="examples.html">Examples</a>
+      <a href="install.html">Install</a>
+    </nav>
+
+    <section class="hero">
+      <h1>Online generator</h1>
+      <p>
+        Test <code>sapblob</code> directly in the browser. The page runs fully client-side via Go WebAssembly,
+        so the uploaded file never leaves your machine. For a public GitHub project this is the right trade-off:
+        low friction without a server-side privacy problem.
+      </p>
+
+      <div class="dropzone" id="dropzone">
+        <strong>Drop one or more SAP BLOB files here</strong><br>
+        <span class="small">or click to choose multiple files</span>
+        <input type="file" id="fileInput" hidden multiple>
+      </div>
+
+      <div class="status" id="wasmStatus">Initializing Go WebAssembly runtime...</div>
+      <div class="summary-line" id="queueSummary">No files processed yet.</div>
+    </section>
+
+    <section class="grid">
+      <article class="card">
+        <h2>What this page does</h2>
+        <p>
+          It reads the SAP wrapper, removes the padding bits, decompresses the raw DEFLATE payload,
+          and lets you download the recovered file. When the recovered payload type is recognized, the browser
+          download uses a matching extension such as <code>.pdf</code> or <code>.png</code>. Unknown types fall back to <code>.bin</code>.
+        </p>
+      </article>
+      <article class="card">
+        <h2>What it does not do</h2>
+        <p>
+          It does not guess business context or invent metadata with false confidence. It only assigns a file extension
+          when the recovered payload can be recognized from well-known magic bytes. If detection is uncertain, the result stays neutral.
+        </p>
+      </article>
+    </section>
+
+    
+    <section class="grid page-section">
+      <article class="card">
+        <h2>Install or download</h2>
+        <p>Prefer the browser for quick tests. For local CLI use, open the Install page for release downloads, installer scripts, and build-from-source instructions.</p>
+      </article>
+      <article class="card">
+        <h2>What the download name means</h2>
+        <p>When the recovered payload type is recognized from magic bytes, the browser uses a matching extension such as <code>.pdf</code> or <code>.png</code>. Otherwise the fallback extension is <code>.bin</code>.</p>
+      </article>
+    </section>
+
+    <section id="results">
+      <article class="card">
+        <h2>Batch results</h2>
+        <p class="small">Each card is independent. Successful outputs can be downloaded one by one.</p>
+        <div id="resultList" class="result-list"></div>
+      </article>
+
+      <article class="card" style="margin-top: 16px;">
+        <h2>Runtime status</h2>
+        <pre id="runtimeLog">Ready.</pre>
+      </article>
+    </section>
+
+    <p class="footer">
+      For installation paths, release downloads, and self-hosting notes, use the navigation above.
+    </p>
+  </div>
+
+  <script src="wasm_exec.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

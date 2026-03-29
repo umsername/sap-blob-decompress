@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>sapblob - troubleshooting</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="container">
+  <nav class="nav">
+    <a href="index.html">Online generator</a>
+    <a href="how-it-works.html">Why it works</a>
+    <a href="help.html">Help</a>
+    <a href="troubleshooting.html">Troubleshooting</a>
+    <a href="examples.html">Examples</a>
+      <a href="install.html">Install</a>
+  </nav>
+
+  <section class="hero">
+    <h1>Common troubleshooting</h1>
+    <p>
+      Most failures come from a few practical causes: the file is not actually
+      an SAP BLOB, it belongs to a different legacy SAP format, the export is
+      truncated, or the output file already exists and overwrite protection
+      stops the write.
+    </p>
+  </section>
+
+  <section class="grid stack page-section">
+    <article class="card">
+      <h2>"implausible uncompressed size"</h2>
+      <p>
+        This usually means the input is not an SAP wrapper at all. A common
+        mistake is passing a compiled executable, a random binary dump, or an
+        already recovered output file back into the tool.
+      </p>
+    </article>
+
+    <article class="card">
+      <h2>"unknown algorithm" or legacy format detected</h2>
+      <p>
+        This repository targets the newer SAP wrapper variant: an 8-byte header,
+        followed by a few padding bits, in front of a raw DEFLATE stream. Older
+        MaxDB-oriented or legacy SAP formats can require different decoding
+        logic.
+      </p>
+    </article>
+
+    <article class="card">
+      <h2>Output already exists</h2>
+      <p>
+        The tool does not overwrite files silently. Use <code>--force</code>
+        only when you intentionally want to replace an existing output file.
+      </p>
+    </article>
+
+    <article class="card">
+      <h2>The recovered file is not named <code>.pdf</code></h2>
+      <p>
+        That does not mean decompression failed. The CLI and web UI try to infer
+        the recovered payload type from magic bytes. If the type cannot be
+        identified with enough confidence, the fallback extension is
+        <code>.bin</code>.
+      </p>
+      <p>
+        The recovered payload is not necessarily a PDF. Depending on the source
+        data, it may be an image, ZIP archive, Office document, XML file, text,
+        or arbitrary binary data.
+      </p>
+    </article>
+
+    <article class="card">
+      <h2><code>--identify-type</code> fails on an output file</h2>
+      <p>
+        The identification mode expects an SAP-compressed input BLOB. It is not
+        a general-purpose file-type tool for arbitrary files that have already
+        been decompressed.
+      </p>
+    </article>
+  </section>
+
+  <section class="card page-section">
+    <h2>Quick sanity checks</h2>
+    <pre># Analyze only
+sapblob example.blob --analyze
+
+# Detect the recovered payload type without writing a file
+sapblob example.blob --identify-type
+
+# Recover the payload with automatic best-effort extension detection
+sapblob example.blob
+
+# Write to an explicit output path
+sapblob example.blob --output recovered.bin
+
+# Overwrite an existing output file intentionally
+sapblob example.blob --output recovered.pdf --force</pre>
+  </section>
+</div>
+</body>
+</html>

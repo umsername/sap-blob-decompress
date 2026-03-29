@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>sapblob - examples</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="container">
+  <nav class="nav">
+    <a href="index.html">Online generator</a>
+    <a href="how-it-works.html">Why it works</a>
+    <a href="help.html">Help</a>
+    <a href="troubleshooting.html">Troubleshooting</a>
+    <a href="examples.html">Examples</a>
+      <a href="install.html">Install</a>
+  </nav>
+
+  <section class="hero">
+    <h1>CLI and self-hosted web examples</h1>
+    <p>
+      The project is designed for two practical use cases: local command-line decompression and a static browser demo that can be hosted on GitHub Pages or any simple static file host. Installation and release-download shortcuts live on the Install page.
+    </p>
+  </section>
+
+  <section class="grid stack page-section">
+    <article class="card">
+      <h2>Basic CLI usage</h2>
+      <pre>sapblob example.blob
+sapblob example.blob --output recovered.pdf
+sapblob example.blob --identify-type
+sapblob example.blob --analyze
+sapblob example.blob --json --analyze
+sapblob example.blob --json --identify-type
+sapblob example.blob --force
+sapblob --help
+sapblob --version</pre>
+      <p>
+        By default, the tool decompresses the SAP BLOB, tries to identify the
+        recovered payload type from magic bytes, and writes the output next to
+        the input file. If the type cannot be identified reliably, it falls back
+        to a <code>.bin</code> extension.
+      </p>
+    </article>
+
+    <article class="card">
+      <h2>What each CLI option looks like</h2>
+      <pre># Decompress and let sapblob choose the output extension
+sapblob example.blob
+
+# Write the recovered payload to an explicit path
+sapblob example.blob --output recovered.pdf
+
+# Inspect the SAP wrapper without writing output
+sapblob example.blob --analyze
+
+# Identify the recovered payload type from magic bytes
+sapblob example.blob --identify-type
+
+# Emit machine-readable JSON
+sapblob example.blob --json --analyze
+sapblob example.blob --json --identify-type
+
+# Overwrite an existing output file
+sapblob example.blob --output recovered.pdf --force
+
+# Show help
+sapblob --help
+
+# Show version information
+sapblob --version</pre>
+    </article>
+
+    <article class="card">
+      <h2>Batch examples</h2>
+      <pre># Linux / macOS
+for f in samples/*.blob; do
+  sapblob "$f"
+done
+
+# Linux / macOS with explicit output directory
+mkdir -p out
+for f in samples/*.blob; do
+  base="$(basename "$f")"
+  sapblob "$f" --output "out/${base}.bin"
+done
+
+# PowerShell
+Get-ChildItem .\samples\*.blob | ForEach-Object {
+  sapblob $_.FullName
+}
+
+# PowerShell with explicit output directory
+New-Item -ItemType Directory -Force .\out | Out-Null
+Get-ChildItem .\samples\*.blob | ForEach-Object {
+  sapblob $_.FullName --output (".\out\" + $_.BaseName + ".bin")
+}</pre>
+      <p>
+        Batch processing is intentionally kept outside the core CLI. Shell loops
+        are simpler, easier to audit, and more in line with the traditional Unix
+        tool model.
+      </p>
+    </article>
+
+    <article class="card">
+      <h2>Run the web version locally</h2>
+      <pre>bash ./web/build.sh
+python -m http.server 8000 --directory web</pre>
+      <p>
+        That is enough for local testing. The browser version runs fully
+        client-side via Go WebAssembly, so uploaded files are processed locally
+        in the browser and are not sent to a server.
+      </p>
+    </article>
+
+    <article class="card">
+      <h2>Host the web version as a static site</h2>
+      <pre># Build the WebAssembly bundle
+bash ./web/build.sh
+
+# Serve the web directory locally for a final check
+python -m http.server 8000 --directory web
+
+# Then publish the contents of ./web through GitHub Pages
+# or any other static site host.</pre>
+      <p>
+        No backend is required. The site only needs to serve static HTML, CSS,
+        JavaScript, <code>wasm_exec.js</code>, and the compiled
+        <code>sapblob.wasm</code> file.
+      </p>
+    </article>
+
+    <article class="card">
+      <h2>Typical workflow</h2>
+      <pre># 1. Inspect the blob
+sapblob example.blob --analyze
+
+# 2. Identify the recovered file type
+sapblob example.blob --identify-type
+
+# 3. Recover the original payload
+sapblob example.blob
+
+# 4. Or choose the output file explicitly
+sapblob example.blob --output recovered.pdf</pre>
+      <p>
+        In practice, most users only need the default decompression path. The
+        analysis and identification modes are mainly there to make reverse
+        engineering, debugging, and validation easier.
+      </p>
+    </article>
+  </section>
+</div>
+</body>
+</html>

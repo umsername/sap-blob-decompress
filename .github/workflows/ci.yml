@@ -1,0 +1,156 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.7'
+          cache: false
+      - run: go test -v -race -coverprofile=coverage.txt ./...
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage.txt
+
+  release:
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            archive_ext: tar.gz
+          - goos: linux
+            goarch: arm64
+            archive_ext: tar.gz
+          - goos: darwin
+            goarch: amd64
+            archive_ext: tar.gz
+          - goos: darwin
+            goarch: arm64
+            archive_ext: tar.gz
+          - goos: windows
+            goarch: amd64
+            archive_ext: zip
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.7'
+          cache: false
+      - name: Build release archive
+        shell: bash
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          VERSION: ${{ github.ref_name }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          BIN_NAME="sapblob"
+          PLATFORM="${GOOS}-${GOARCH}"
+          EXT=""
+          if [[ "$GOOS" == "windows" ]]; then
+            EXT=".exe"
+          fi
+
+          DIST_DIR="dist/${VERSION}"
+          STAGE_DIR="${DIST_DIR}/${BIN_NAME}_${PLATFORM}"
+
+          mkdir -p "$STAGE_DIR"
+
+          go build \
+            -trimpath \
+            -ldflags="-s -w -X main.version=${VERSION} -X main.commit=${COMMIT} -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            -o "${STAGE_DIR}/${BIN_NAME}${EXT}" \
+            ./cmd/sapblob
+
+          cp README.md LICENSE "$STAGE_DIR/"
+
+          ARCHIVE_BASE="${DIST_DIR}/${BIN_NAME}_${VERSION}_${PLATFORM}"
+
+          if [[ "${{ matrix.archive_ext }}" == "zip" ]]; then
+            (
+              cd "$DIST_DIR"
+              zip -rq "$(basename "${ARCHIVE_BASE}").zip" "$(basename "$STAGE_DIR")"
+            )
+          else
+            tar -C "$DIST_DIR" -czf "${ARCHIVE_BASE}.tar.gz" "$(basename "$STAGE_DIR")"
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/${{ github.ref_name }}/*
+
+  publish-release:
+    needs: release
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: release-*
+          merge-multiple: true
+      - name: Generate checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd artifacts
+          find . -maxdepth 1 -type f \( -name '*.tar.gz' -o -name '*.zip' \) -print0 \
+            | sort -z \
+            | xargs -0 sha256sum > checksums.txt
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/*.tar.gz
+            artifacts/*.zip
+            artifacts/checksums.txt
+          generate_release_notes: true
+
+  pages:
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.7'
+          cache: false
+      - uses: actions/configure-pages@v5
+      - run: bash ./web/build.sh
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+      - uses: actions/deploy-pages@v4
