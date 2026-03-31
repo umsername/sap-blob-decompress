@@ -9,7 +9,7 @@
 <body>
 <div class="container">
   <nav class="nav">
-    <a href="index.html">Online generator</a>
+    <a href="index.html">Online decompressor</a>
     <a href="how-it-works.html">Why it works</a>
     <a href="help.html">Help</a>
     <a href="troubleshooting.html">Troubleshooting</a>
@@ -37,17 +37,17 @@
 
   <section class="card page-section">
     <h2>The full reverse-engineering story</h2>
-    <p>The starting point was a file called <code>test.data021</code>: high-entropy binary data extracted from an SAP data BLOB, known to contain a document, but unreadable by ordinary archive and compression tools.</p>
+    <p>The starting point was a file called <code>example.blob</code>: high-entropy binary data extracted from an SAP data BLOB, known to contain a document, but unreadable by ordinary archive and compression tools.</p>
     <h3>The problem</h3>
     <p>The file was 118,703 bytes of unrecognizable binary. It clearly came from an SAP-backed storage flow, but after extraction as a raw database BLOB, ordinary tools could not open it. The task was simple in theory and tedious in practice: determine what the wrapper was doing and recover the original file bytes without relying on proprietary tooling.</p>
     <h3>Step 1: First look</h3>
-    <pre>$ file test.data021
-test.data021: data
+    <pre>$ file example.blob
+example.blob: data
 
 $ python3 -c "
 from collections import Counter
 import math
-data = open('test.data021','rb').read()
+data = open('example.blob','rb').read()
 freq = Counter(data)
 H = -sum((c/len(data))*math.log2(c/len(data)) for c in freq.values())
 print(f'Entropy: {H:.2f} bits/byte')
