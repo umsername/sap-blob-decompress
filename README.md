@@ -1,14 +1,13 @@
 # sapblob
 
-`sapblob` is a small Go tool and static web demo for decompressing the modern SAP BLOB wrapper variant that stores an 8-byte SAP header, a few padding bits, and a raw DEFLATE payload.
+`sapblob` is a small Go tool and static web demo for decompressing a modern SAP BLOB wrapper variant that stores an 8-byte SAP header, a few padding bits, and a raw DEFLATE payload.
 
-The browser demo is the main public entry point for the project. It lets people try the generator immediately while keeping uploads fully client-side.
-
+The [browser demo](https://umsername.github.io/sap-blob-decompress/) is the main public entry point for the project. It provides an easy way to try the decompressor while keeping uploads fully client-side.
 ## Website-first layout
 
 The main documentation now lives in the static website under `web/`:
 
-- `web/index.html` — online generator
+- `web/index.html` — online decompressor
 - `web/how-it-works.html` — technical explanation and research lineage
 - `web/help.html` — CLI help, install paths, and naming rules
 - `web/troubleshooting.html` — common failure modes and sanity checks
