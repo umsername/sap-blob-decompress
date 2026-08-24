@@ -74,3 +74,11 @@ The web page is more ergonomic: when the payload type is recognized from magic b
 ## License
 
 MIT, for this repository's original code. External research and upstream SAP/MaxDB code remain subject to their own licenses and attribution requirements.
+
+## Trademark Notice
+
+SAP, SAP NetWeaver, SAP GUI, SAPCAR, MaxDB, and all related SAP product names are trademarks or registered trademarks of SAP SE or its affiliates in Germany and other countries.
+
+This project is NOT affiliated with, endorsed by, or sponsored by SAP SE or any of its affiliates. It is an independent open-source tool created through clean-room analysis of publicly available open-source code (MaxDB, GPL v2) and published security research.
+
+This software does not contain any SAP proprietary code. The decompression is performed entirely using standard DEFLATE (RFC 1951) via Go's built-in `compress/flate` package.
